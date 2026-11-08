@@ -76,3 +76,30 @@ suite('module loading', function () {
     })
   })
 })
+
+suite('licence banners', function () {
+  var root = path.join(__dirname, '..')
+
+  var bannerSources = function () {
+    var libDir = path.join(root, 'lib')
+
+    return [path.join(root, 'build', 'wrapper_start')].concat(
+      fs.readdirSync(libDir)
+        .filter(function (file) { return /\.js$/.test(file) })
+        .map(function (file) { return path.join(libDir, file) })
+    )
+  }
+
+  // banner comments are kept by minifiers and bundlers and end up in
+  // downstream LICENSE files, where link checkers flag plain http links
+  test('link over https', function () {
+    bannerSources().forEach(function (file) {
+      var source = fs.readFileSync(file, 'utf8'),
+          banners = source.match(/\/\*[*!][\s\S]*?\*\//g) || []
+
+      banners.forEach(function (banner) {
+        assert.notMatch(banner, /http:\/\//, path.relative(root, file))
+      })
+    })
+  })
+})
