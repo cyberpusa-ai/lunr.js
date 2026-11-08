@@ -1196,4 +1196,80 @@ suite('search', function () {
       assert.equal('a', results[0].ref)
     })
   })
+
+  suite('with a token set term missing from the inverted index', function () {
+    setup(function () {
+      var built = lunr(function () {
+        this.ref('id')
+        this.field('title')
+
+        this.add({ id: 'a', title: 'green plant' })
+      })
+
+      this.idx = new lunr.Index({
+        invertedIndex: built.invertedIndex,
+        fieldVectors: built.fieldVectors,
+        tokenSet: lunr.TokenSet.fromArray(['green', 'greenhous', 'plant']),
+        fields: built.fields,
+        pipeline: built.pipeline
+      })
+    })
+
+    test('wildcard search does not throw', function () {
+      var results = this.idx.search('green*')
+      assert.lengthOf(results, 1)
+      assert.equal('a', results[0].ref)
+    })
+
+    test('fuzzy search does not throw', function () {
+      var results = this.idx.search('greenhouse~1')
+      assert.lengthOf(results, 0)
+    })
+
+    test('required term search does not throw', function () {
+      var results = this.idx.search('+greenhouse')
+      assert.lengthOf(results, 0)
+    })
+
+    test('term missing a field from its posting does not throw', function () {
+      delete this.idx.invertedIndex['green'].title
+
+      var results = this.idx.search('+title:green plant')
+      assert.lengthOf(results, 0)
+    })
+  })
+
+  suite('with a pipeline returning several terms for a clause', function () {
+    setup(function () {
+      var self = this
+
+      this.idx = lunr(function () {
+        this.ref('id')
+        this.field('title')
+
+        this.add({ id: 'a', title: 'green' })
+        this.add({ id: 'b', title: 'plant' })
+      })
+
+      this.idx.pipeline = new lunr.Pipeline
+      this.idx.pipeline.add(function (token) {
+        return token.toString() == 'greenplant'
+          ? [token.clone(function () { return 'green' }), token.clone(function () { return 'plant' })]
+          : token
+      })
+
+      this.results = this.idx.query(function (q) {
+        q.term('greenplant')
+        self.clause = q.clauses[0]
+      })
+    })
+
+    test('every term is searched', function () {
+      assert.sameMembers(['a', 'b'], this.results.map(function (r) { return r.ref }))
+    })
+
+    test('the query clause is not mutated', function () {
+      assert.equal('greenplant', this.clause.term)
+    })
+  })
 })
