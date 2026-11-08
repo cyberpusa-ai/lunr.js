@@ -50,4 +50,26 @@ suite('serialization', function () {
 
     assert.deepEqual(idxResults, doubleSerializedResults)
   })
+
+  test('search pipeline includes the trimmer', function () {
+    assert.deepEqual(['trimmer', 'stemmer'], JSON.parse(this.serializedIdx).pipeline)
+  })
+
+  test('search with punctuation', function () {
+    var idxResults = this.idx.search('green?'),
+        serializedResults = this.loadedIdx.search('green?')
+
+    assert.lengthOf(idxResults, 3)
+    assert.deepEqual(idxResults, serializedResults)
+  })
+
+  test('loading an index with a stemmer only search pipeline', function () {
+    var serialized = JSON.parse(this.serializedIdx)
+    serialized.pipeline = ['stemmer']
+
+    var legacyIdx = lunr.Index.load(serialized)
+
+    assert.lengthOf(legacyIdx.search('green'), 3)
+    assert.lengthOf(legacyIdx.search('green?'), 0)
+  })
 })

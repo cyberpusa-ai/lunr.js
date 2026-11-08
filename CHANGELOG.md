@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* Fix bug [#532](https://github.com/olivernn/lunr.js/issues/532) where query terms with leading or trailing punctuation, e.g. `question?`, would not match, because the default search pipeline did not include the trimmer. **Behaviour change:** newly built indexes now use a search pipeline of `trimmer`, `stemmer`. Indexes serialised by earlier versions keep their stored `stemmer` only search pipeline and search exactly as before; rebuild them to pick up the fix. Thanks to the reporter of #532, and to [lunr.py#151](https://github.com/yeraydiazdiaz/lunr.py/issues/151) for the matching diagnosis.
+
 ## 2.3.9
 
 * Fix bug [#469](https://github.com/olivernn/lunr.js/issues/469) where a union with a complete set returned a non-complete set. Thanks [Bertrand Le Roy](https://github.com/bleroy) for reporting and fixing.

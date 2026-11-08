@@ -1097,4 +1097,60 @@ suite('search', function () {
       })
     })
   })
+
+  suite('query terms with surrounding punctuation', function () {
+    setup(function () {
+      var self = this
+
+      this.idx = lunr(function () {
+        this.ref('id')
+        this.field('title')
+        this.field('body')
+
+        self.documents.forEach(function (document) {
+          this.add(document)
+        }, this)
+      })
+    })
+
+    suite('#search', function () {
+      setup(function () {
+        this.results = this.idx.search('Who watered the plant?')
+      })
+
+      test('trims the query terms', function () {
+        assert.lengthOf(this.results, 2)
+        assert.sameMembers(['b', 'c'], this.results.map(function (r) { return r.ref }))
+      })
+
+      test('match data uses the trimmed term', function () {
+        this.results.forEach(function (result) {
+          assert.property(result.matchData.metadata, 'plant')
+        })
+      })
+    })
+
+    suite('#search with presence', function () {
+      setup(function () {
+        this.results = this.idx.search('+"scarlett" +plant?')
+      })
+
+      test('trims required terms', function () {
+        assert.lengthOf(this.results, 1)
+        assert.equal('c', this.results[0].ref)
+      })
+    })
+
+    suite('#query with usePipeline', function () {
+      setup(function () {
+        this.results = this.idx.query(function (q) {
+          q.term('(study)', { usePipeline: true })
+        })
+      })
+
+      test('trims the term', function () {
+        assert.lengthOf(this.results, 2)
+      })
+    })
+  })
 })
