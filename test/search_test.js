@@ -1171,4 +1171,29 @@ suite('search', function () {
       })
     })
   })
+
+  suite('with a custom tokenizer separator', function () {
+    setup(function () {
+      this.originalSeparator = lunr.tokenizer.separator
+      lunr.tokenizer.separator = /\s+/
+
+      this.idx = lunr(function () {
+        this.ref('id')
+        this.field('title')
+
+        this.add({ id: 'a', title: 'foo-bar baz' })
+        this.add({ id: 'b', title: 'foo bar' })
+      })
+    })
+
+    teardown(function () {
+      lunr.tokenizer.separator = this.originalSeparator
+    })
+
+    test('hyphenated term is found', function () {
+      var results = this.idx.search('foo-bar')
+      assert.lengthOf(results, 1)
+      assert.equal('a', results[0].ref)
+    })
+  })
 })

@@ -569,5 +569,41 @@ suite('lunr.QueryLexer', function () {
       })
     })
 
+    suite('custom tokenizer separator', function () {
+      setup(function () {
+        this.originalSeparator = lunr.tokenizer.separator
+        lunr.tokenizer.separator = /\s+/
+        this.lexer = lex('foo-bar baz')
+      })
+
+      teardown(function () {
+        lunr.tokenizer.separator = this.originalSeparator
+      })
+
+      test('follows the tokenizer separator', function () {
+        assert.lengthOf(this.lexer.lexemes, 2)
+        assert.equal('foo-bar', this.lexer.lexemes[0].str)
+        assert.equal('baz', this.lexer.lexemes[1].str)
+      })
+    })
+
+    suite('explicit term separator', function () {
+      setup(function () {
+        this.originalTermSeparator = lunr.QueryLexer.termSeparator
+        lunr.QueryLexer.termSeparator = /[\s_]+/
+        this.lexer = lex('foo_bar-baz')
+      })
+
+      teardown(function () {
+        lunr.QueryLexer.termSeparator = this.originalTermSeparator
+      })
+
+      test('takes precedence over the tokenizer separator', function () {
+        assert.lengthOf(this.lexer.lexemes, 2)
+        assert.equal('foo', this.lexer.lexemes[0].str)
+        assert.equal('bar-baz', this.lexer.lexemes[1].str)
+      })
+    })
+
   })
 })
