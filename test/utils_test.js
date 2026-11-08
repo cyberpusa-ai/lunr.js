@@ -1,4 +1,35 @@
 suite('lunr.utils', function () {
+  suite('#warn', function () {
+    setup(function () {
+      var messages = this.messages = []
+      this.originalWarn = console.warn
+      console.warn = function (message) { messages.push(message) }
+    })
+
+    teardown(function () {
+      console.warn = this.originalWarn
+    })
+
+    test('prints the message with console.warn', function () {
+      lunr.utils.warn('careful')
+      assert.deepEqual(['careful'], this.messages)
+    })
+
+    test('works when lunr is evaluated in strict mode', function () {
+      var source = require('fs').readFileSync(require('path').join(__dirname, '..', 'lunr.js'), 'utf8'),
+          module = { exports: {} },
+          strictLunr
+
+      new Function('module', 'exports', '"use strict";\n' + source)(module, module.exports)
+      strictLunr = module.exports
+
+      assert.doesNotThrow(function () {
+        strictLunr.utils.warn('careful')
+      })
+      assert.deepEqual(['careful'], this.messages)
+    })
+  })
+
   suite('#clone', function () {
     var subject = function (obj) {
       setup(function () {

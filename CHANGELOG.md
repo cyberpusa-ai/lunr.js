@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Fix bug [#324](https://github.com/olivernn/lunr.js/issues/324) where `lunr.utils.warn` threw a `TypeError` when lunr was evaluated in strict mode, e.g. by Babel or when bundled as an ES module, because it looked up `console` on `this`. Thanks to the reporter of #324 and [indolering](https://github.com/indolering) for the fix in [#411](https://github.com/olivernn/lunr.js/pull/411).
 * Fix bug [#532](https://github.com/olivernn/lunr.js/issues/532) where query terms with leading or trailing punctuation, e.g. `question?`, returned no results because the default search pipeline did not include `lunr.trimmer`. **Default behaviour change:** newly built indexes now use a `trimmer, stemmer` search pipeline. Serialised indexes keep the search pipeline they were saved with, so existing 2.3.x indexes search exactly as before. Leading and trailing wildcards added with `lunr.Query.wildcard` are kept when a term is passed through the pipeline. Thanks to the reporter of #532 and to [lunr.py#151](https://github.com/yeraydiazdiaz/lunr.py/issues/151) for the diagnosis.
 
 ## 2.3.9
