@@ -69,6 +69,65 @@ suite('serialization', function () {
     assert.lengthOf(results, 2)
   })
 
+  test('serialized postings include every field', function () {
+    var invertedIndex = JSON.parse(this.serializedIdx).invertedIndex
+
+    invertedIndex.forEach(function (tuple) {
+      assert.property(tuple[1], '_index')
+      assert.property(tuple[1], 'title')
+      assert.property(tuple[1], 'body')
+    })
+
+    assert.deepEqual(this.idx.toJSON(), this.loadedIdx.toJSON())
+  })
+
+  test('loading drops empty field postings', function () {
+    assert.notProperty(this.loadedIdx.invertedIndex.help, 'body')
+    assert.deepProperty(this.loadedIdx.invertedIndex, 'help.title.c')
+  })
+
+  test('loading an index with pruned field postings', function () {
+    var json = JSON.parse(this.serializedIdx)
+
+    json.invertedIndex.forEach(function (tuple) {
+      var posting = tuple[1]
+
+      Object.keys(posting).forEach(function (field) {
+        if (field != '_index' && Object.keys(posting[field]).length == 0) {
+          delete posting[field]
+        }
+      })
+    })
+
+    var prunedIdx = lunr.Index.load(json)
+
+    assert.deepEqual(this.idx.search('green'), prunedIdx.search('green'))
+    assert.deepEqual(this.idx.search('title:kill'), prunedIdx.search('title:kill'))
+    assert.deepEqual(this.idx.search('body:kill'), prunedIdx.search('body:kill'))
+    assert.deepEqual(this.idx.search('+plant -title:plant'), prunedIdx.search('+plant -title:plant'))
+    assert.deepEqual(this.idx.search('pl*'), prunedIdx.search('pl*'))
+    assert.deepEqual(this.idx.toJSON(), prunedIdx.toJSON())
+  })
+
+  test('__proto__ field serialization', function () {
+    var idx = lunr(function () {
+      this.ref('id')
+      this.field('__proto__')
+      this.field('body')
+      this.add(JSON.parse('{"id": "a", "__proto__": "green", "body": "plant"}'))
+    })
+
+    var json = JSON.parse(JSON.stringify(idx)),
+        loadedIdx = lunr.Index.load(json)
+
+    json.invertedIndex.forEach(function (tuple) {
+      assert.include(Object.keys(tuple[1]), '__proto__')
+    })
+
+    assert.deepEqual(idx.search('green'), loadedIdx.search('green'))
+    assert.lengthOf(loadedIdx.search('green'), 1)
+  })
+
   test('__proto__ double serialization', function () {
     var doubleLoadedIdx = lunr.Index.load(JSON.parse(JSON.stringify(this.loadedIdx))),
         idxResults = this.idx.search('__proto__'),

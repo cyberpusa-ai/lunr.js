@@ -67,6 +67,17 @@ suite('lunr.Builder', function () {
 
       assert.deepProperty(this.builder.invertedIndex, 'bob.name.id')
     })
+
+    test('only creates postings for fields that contain the term', function () {
+      this.builder.field('title')
+      this.builder.field('body')
+      this.builder.add({ id: 'id', title: 'foo', body: 'bar' })
+
+      assert.deepProperty(this.builder.invertedIndex, 'foo.title.id')
+      assert.notProperty(this.builder.invertedIndex.foo, 'body')
+      assert.deepProperty(this.builder.invertedIndex, 'bar.body.id')
+      assert.notProperty(this.builder.invertedIndex.bar, 'title')
+    })
   })
 
   suite('#field', function () {
