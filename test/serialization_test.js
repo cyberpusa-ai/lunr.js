@@ -43,6 +43,32 @@ suite('serialization', function () {
     assert.deepEqual(idxResults, serializedResults)
   })
 
+  test('search pipeline', function () {
+    assert.deepEqual(['trimmer', 'stemmer'], JSON.parse(this.serializedIdx).pipeline)
+  })
+
+  test('search with trailing punctuation', function () {
+    var idxResults = this.idx.search('green?'),
+        serializedResults = this.loadedIdx.search('green?')
+
+    assert.lengthOf(idxResults, 3)
+    assert.deepEqual(idxResults, serializedResults)
+  })
+
+  test('index with stemmer only search pipeline', function () {
+    var json = JSON.parse(this.serializedIdx)
+    json.pipeline = ['stemmer']
+
+    var oldIdx = lunr.Index.load(json),
+        results = oldIdx.query(function (q) {
+          q.term('pla', { wildcard: lunr.Query.wildcard.TRAILING })
+        })
+
+    assert.lengthOf(oldIdx.search('green?'), 0)
+    assert.lengthOf(oldIdx.search('green'), 3)
+    assert.lengthOf(results, 2)
+  })
+
   test('__proto__ double serialization', function () {
     var doubleLoadedIdx = lunr.Index.load(JSON.parse(JSON.stringify(this.loadedIdx))),
         idxResults = this.idx.search('__proto__'),

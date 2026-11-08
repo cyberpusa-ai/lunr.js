@@ -431,6 +431,80 @@ suite('search', function () {
       })
     })
 
+    suite('trailing punctuation', function () {
+      setup(function () {
+        this.results = this.idx.search('green? plant!')
+      })
+
+      test('punctuation is trimmed from query terms', function () {
+        assert.lengthOf(this.results, 3)
+      })
+
+      test('matching terms returned', function () {
+        assert.sameMembers(['green', 'plant'], Object.keys(this.results[0].matchData.metadata))
+      })
+    })
+
+    suite('programmatic wildcards with pipeline', function () {
+      suite('trailing wildcard', function () {
+        setup(function () {
+          this.results = this.idx.query(function (q) {
+            q.term('pla', { wildcard: lunr.Query.wildcard.TRAILING })
+          })
+        })
+
+        test('wildcard is kept', function () {
+          assert.lengthOf(this.results, 2)
+          assert.sameMembers(['b', 'c'], this.results.map(function (r) { return r.ref }))
+        })
+
+        test('matching terms returned', function () {
+          assert.sameMembers(['plant'], Object.keys(this.results[0].matchData.metadata))
+        })
+      })
+
+      suite('leading wildcard', function () {
+        setup(function () {
+          this.results = this.idx.query(function (q) {
+            q.term('ant', { wildcard: lunr.Query.wildcard.LEADING })
+          })
+        })
+
+        test('wildcard is kept', function () {
+          assert.lengthOf(this.results, 2)
+          assert.sameMembers(['b', 'c'], this.results.map(function (r) { return r.ref }))
+        })
+      })
+
+      suite('leading wildcard with stemmed term', function () {
+        setup(function () {
+          this.results = this.idx.query(function (q) {
+            q.term('plants', { wildcard: lunr.Query.wildcard.LEADING })
+          })
+        })
+
+        test('term is stemmed and wildcard is kept', function () {
+          assert.lengthOf(this.results, 2)
+          assert.sameMembers(['plant'], Object.keys(this.results[0].matchData.metadata))
+        })
+      })
+
+      suite('leading and trailing wildcard', function () {
+        setup(function () {
+          this.results = this.idx.query(function (q) {
+            q.term('lan', {
+              wildcard: lunr.Query.wildcard.LEADING | lunr.Query.wildcard.TRAILING
+            })
+          })
+        })
+
+        test('both wildcards are kept', function () {
+          assert.lengthOf(this.results, 2)
+          assert.sameMembers(['plant'], Object.keys(this.results[0].matchData.metadata))
+        })
+      })
+    })
+
     suite('wildcard matching', function () {
       suite('trailing wildcard', function () {
         suite('no matches found', function () {
