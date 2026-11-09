@@ -86,6 +86,37 @@ Browsers that do not support ES5 will require a JavaScript shim for Lunr to work
 * Scope searches to specific fields
 * Fuzzy term matching with wildcards or edit distance
 
+## Searching untrusted or literal input
+
+`idx.search` parses its argument with the [query syntax](https://lunrjs.com/guides/searching.html): `field:term`, `term^boost`, `term~distance`, `*` wildcards and `+`/`-` presence. Text typed into a search box can therefore be read as operators. For example `idx.search("ERROR: This")` throws a `lunr.QueryParseError`, because `ERROR` is taken as a field name. There are two ways to deal with this.
+
+Catch the error, and show no results or a message:
+
+```javascript
+try {
+  var results = idx.search(userInput)
+} catch (e) {
+  if (!(e instanceof lunr.QueryParseError)) throw e
+  var results = []
+}
+```
+
+Or skip the query parser and search for every word of the input literally, using `idx.query` and `lunr.tokenizer`:
+
+```javascript
+var results = idx.query(function (q) {
+  lunr.tokenizer(userInput).forEach(function (token) {
+    q.term(token.toString().replace(/\*/g, ''), {
+      presence: lunr.Query.presence.OPTIONAL
+    })
+  })
+})
+```
+
+Here `field:` prefixes and the `^`, `~`, `+` and `-` operators have no special meaning, and removing `*` stops it from acting as a wildcard. Each word still goes through the search pipeline (trimmer and stemmer), so results match those of `idx.search` for plain words.
+
+To use the query syntax but match a single operator character literally, escape it with a backslash: `idx.search("ERROR\\: This")`.
+
 ## Contributing
 
 See the [`CONTRIBUTING.md` file](CONTRIBUTING.md).

@@ -1272,4 +1272,66 @@ suite('search', function () {
       assert.equal('greenplant', this.clause.term)
     })
   })
+
+  suite('searching untrusted or literal input', function () {
+    setup(function () {
+      this.idx = lunr(function () {
+        this.ref('id')
+        this.field('title')
+        this.field('body')
+
+        this.add({ id: 'a', title: 'Build log', body: 'ERROR: This build failed' })
+        this.add({ id: 'b', title: 'Release notes', body: 'Nothing failed in this release' })
+      })
+
+      // the literal search recipe documented in README.md
+      this.literalSearch = function (userInput) {
+        return this.idx.query(function (q) {
+          lunr.tokenizer(userInput).forEach(function (token) {
+            q.term(token.toString().replace(/\*/g, ''), {
+              presence: lunr.Query.presence.OPTIONAL
+            })
+          })
+        })
+      }
+    })
+
+    test('search treats an unknown field prefix as a parse error', function () {
+      var idx = this.idx
+
+      assert.throws(function () {
+        idx.search('ERROR: This')
+      }, lunr.QueryParseError)
+    })
+
+    test('an escaped colon is searched literally', function () {
+      var results = this.idx.search('ERROR\\: This')
+
+      assert.deepEqual(['a'], results.map(function (r) { return r.ref }))
+    })
+
+    test('a field prefix is searched literally', function () {
+      var results = this.literalSearch('ERROR: This')
+
+      assert.deepEqual(['a'], results.map(function (r) { return r.ref }))
+      assert.property(results[0].matchData.metadata, 'error')
+    })
+
+    test('the search pipeline still runs', function () {
+      var results = this.literalSearch('Builds')
+
+      assert.deepEqual(['a'], results.map(function (r) { return r.ref }))
+    })
+
+    test('presence operators are ignored', function () {
+      var results = this.literalSearch('+release -failed')
+
+      assert.sameMembers(['a', 'b'], results.map(function (r) { return r.ref }))
+    })
+
+    test('a wildcard is not expanded', function () {
+      assert.lengthOf(this.literalSearch('*'), 0)
+      assert.lengthOf(this.literalSearch('bui*'), 0)
+    })
+  })
 })
