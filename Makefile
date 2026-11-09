@@ -21,7 +21,8 @@ SRC = lib/lunr.js \
 	lib/query_lexer.js \
 	lib/query_parser.js \
 
-YEAR = $(shell date +%Y)
+# Year of the original copyright notices (Oliver Nightingale); not bumped by the fork.
+YEAR = 2020
 VERSION = $(shell cat VERSION)
 
 NODE ?= $(shell which node)

@@ -1,7 +1,9 @@
 /**
  * lunr - https://lunrjs.com - A bit like Solr, but much smaller and not as bright - @VERSION
- * Copyright (C) @YEAR Oliver Nightingale
+ * Copyright (C) 2020 Oliver Nightingale
  * @license MIT
+ *
+ * lunr-lts: maintained fork of lunr, https://github.com/cyberpusa-ai/lunr.js
  */
 
 ;(function(){

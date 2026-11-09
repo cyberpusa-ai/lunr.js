@@ -1,7 +1,9 @@
 /**
- * lunr - http://lunrjs.com - A bit like Solr, but much smaller and not as bright - 2.3.9
+ * lunr - https://lunrjs.com - A bit like Solr, but much smaller and not as bright - 2.4.0
  * Copyright (C) 2020 Oliver Nightingale
  * @license MIT
+ *
+ * lunr-lts: maintained fork of lunr, https://github.com/cyberpusa-ai/lunr.js
  */
 
 ;(function(){
@@ -11,7 +13,8 @@
  * a new lunr Index.
  *
  * A lunr.Builder instance is created and the pipeline setup
- * with a trimmer, stop word filter and stemmer.
+ * with a trimmer, stop word filter and stemmer. The search
+ * pipeline is setup with a trimmer and stemmer.
  *
  * This builder object is yielded to the configuration function
  * that is passed as a parameter, allowing the list of fields
@@ -47,6 +50,7 @@ var lunr = function (config) {
   )
 
   builder.searchPipeline.add(
+    lunr.trimmer,
     lunr.stemmer
   )
 
@@ -54,7 +58,7 @@ var lunr = function (config) {
   return builder.build()
 }
 
-lunr.version = "2.3.9"
+lunr.version = "2.4.0"
 /*!
  * lunr.utils
  * Copyright (C) 2020 Oliver Nightingale
@@ -73,15 +77,13 @@ lunr.utils = {}
  * @memberOf lunr.utils
  * @function
  */
-lunr.utils.warn = (function (global) {
+lunr.utils.warn = function (message) {
   /* eslint-disable no-console */
-  return function (message) {
-    if (global.console && console.warn) {
-      console.warn(message)
-    }
+  if (typeof console !== 'undefined' && console.warn) {
+    console.warn(message)
   }
   /* eslint-enable no-console */
-})(this)
+}
 
 /**
  * Convert an object to a string.
@@ -930,12 +932,12 @@ lunr.Vector.prototype.toJSON = function () {
 /*!
  * lunr.stemmer
  * Copyright (C) 2020 Oliver Nightingale
- * Includes code from - http://tartarus.org/~martin/PorterStemmer/js.txt
+ * Includes code from - https://tartarus.org/~martin/PorterStemmer/js.txt
  */
 
 /**
  * lunr.stemmer is an english language stemmer, this is a JavaScript
- * implementation of the PorterStemmer taken from http://tartarus.org/~martin
+ * implementation of the PorterStemmer taken from https://tartarus.org/~martin
  *
  * @static
  * @implements {lunr.PipelineFunction}
@@ -2000,6 +2002,26 @@ lunr.Index.prototype.query = function (fn) {
       terms = this.pipeline.runString(clause.term, {
         fields: clause.fields
       })
+
+      /*
+       * Wildcards added with lunr.Query.wildcard.LEADING or TRAILING
+       * are part of the term when it is passed through the pipeline,
+       * pipeline functions such as lunr.trimmer may remove them. Any
+       * leading or trailing wildcard removed by the pipeline is put
+       * back so that the clause still matches as a wildcard term.
+       */
+      var hasLeadingWildcard = clause.term.charAt(0) == lunr.Query.wildcard,
+          hasTrailingWildcard = clause.term.slice(-1) == lunr.Query.wildcard
+
+      for (var t = 0; t < terms.length; t++) {
+        if (hasLeadingWildcard && terms[t].charAt(0) != lunr.Query.wildcard) {
+          terms[t] = "*" + terms[t]
+        }
+
+        if (hasTrailingWildcard && terms[t].slice(-1) != lunr.Query.wildcard) {
+          terms[t] = "" + terms[t] + "*"
+        }
+      }
     } else {
       terms = [clause.term]
     }
@@ -2010,18 +2032,42 @@ lunr.Index.prototype.query = function (fn) {
       /*
        * Each term returned from the pipeline needs to use the same query
        * clause object, e.g. the same boost and or edit distance. The
-       * simplest way to do this is to re-use the clause object but mutate
-       * its term property.
+       * simplest way to do this is to copy the clause object and set the
+       * term property on the copy. Copying, rather than mutating the clause
+       * shared across iterations, also avoids a crash in Safari/iOS where
+       * wildcard and fuzzy queries failed to find postings.
        */
-      clause.term = term
+      var termClause = Object.create(null),
+          clauseKeys = Object.keys(clause)
+
+      for (var c = 0; c < clauseKeys.length; c++) {
+        termClause[clauseKeys[c]] = clause[clauseKeys[c]]
+      }
+
+      termClause.term = term
 
       /*
        * From the term in the clause we create a token set which will then
        * be used to intersect the indexes token set to get a list of terms
        * to lookup in the inverted index
        */
-      var termTokenSet = lunr.TokenSet.fromClause(clause),
+      var termTokenSet = lunr.TokenSet.fromClause(termClause),
           expandedTerms = this.tokenSet.intersect(termTokenSet).toArray()
+
+      /*
+       * Every term in the token set should have a posting in the inverted
+       * index. Any term that does not is skipped rather than causing the
+       * query to throw.
+       */
+      var postedTerms = []
+
+      for (var j = 0; j < expandedTerms.length; j++) {
+        if (this.invertedIndex[expandedTerms[j]] !== undefined) {
+          postedTerms.push(expandedTerms[j])
+        }
+      }
+
+      expandedTerms = postedTerms
 
       /*
        * If a term marked as required does not exist in the tokenSet it is
@@ -2057,7 +2103,7 @@ lunr.Index.prototype.query = function (fn) {
            * term from above.
            */
           var field = clause.fields[k],
-              fieldPosting = posting[field],
+              fieldPosting = posting[field] || Object.create(null),
               matchingDocumentRefs = Object.keys(fieldPosting),
               termField = expandedTerm + "/" + field,
               matchingDocumentsSet = new lunr.Set(matchingDocumentRefs)
@@ -2253,7 +2299,28 @@ lunr.Index.prototype.toJSON = function () {
   var invertedIndex = Object.keys(this.invertedIndex)
     .sort()
     .map(function (term) {
-      return [term, this.invertedIndex[term]]
+      var posting = this.invertedIndex[term],
+          serializedPosting = Object.create(null)
+
+      serializedPosting._index = posting._index
+
+      /*
+       * Postings only hold the fields that contain the term. Every field
+       * is written out, empty or not, so that the serialized index has the
+       * same shape as one built by earlier versions of lunr, which expect
+       * each posting to include every field.
+       */
+      for (var i = 0; i < this.fields.length; i++) {
+        serializedPosting[this.fields[i]] = posting[this.fields[i]] || {}
+      }
+
+      for (var key in posting) {
+        if (!(key in serializedPosting)) {
+          serializedPosting[key] = posting[key]
+        }
+      }
+
+      return [term, serializedPosting]
     }, this)
 
   var fieldVectors = Object.keys(this.fieldVectors)
@@ -2300,7 +2367,22 @@ lunr.Index.load = function (serializedIndex) {
   for (var i = 0; i < serializedInvertedIndex.length; i++) {
     var tuple = serializedInvertedIndex[i],
         term = tuple[0],
-        posting = tuple[1]
+        serializedPosting = tuple[1],
+        posting = Object.create(null)
+
+    /*
+     * Serialized postings include an empty object for every field that
+     * does not contain the term, these are dropped to save memory.
+     */
+    for (var key in serializedPosting) {
+      var value = serializedPosting[key]
+
+      if (typeof value == 'object' && value !== null && Object.keys(value).length == 0) {
+        continue
+      }
+
+      posting[key] = value
+    }
 
     tokenSetBuilder.insert(term)
     invertedIndex[term] = posting
@@ -2506,11 +2588,13 @@ lunr.Builder.prototype.add = function (doc, attributes) {
         posting["_index"] = this.termIndex
         this.termIndex += 1
 
-        for (var k = 0; k < fields.length; k++) {
-          posting[fields[k]] = Object.create(null)
-        }
-
         this.invertedIndex[term] = posting
+      }
+
+      // only fields that contain the term get an entry in its posting,
+      // most terms appear in only a few fields
+      if (this.invertedIndex[term][fieldName] == undefined) {
+        this.invertedIndex[term][fieldName] = Object.create(null)
       }
 
       // add an entry for this term/fieldName/docRef to the invertedIndex
@@ -3131,9 +3215,43 @@ lunr.QueryLexer.lexEOS = function (lexer) {
 // This means that it is possible to change the separator in
 // such a way that makes some words unsearchable using a search
 // string.
+//
+// The separator is looked up each time a query is tokenised. Unless
+// lunr.QueryLexer.termSeparator has been explicitly changed it
+// follows the current value of lunr.tokenizer.separator, so that
+// overriding the tokenizer separator also affects search strings.
 lunr.QueryLexer.termSeparator = lunr.tokenizer.separator
 
+/**
+ * The original value of lunr.QueryLexer.termSeparator, used to detect
+ * whether the term separator has been explicitly overridden.
+ *
+ * @memberOf lunr.QueryLexer
+ * @see lunr.QueryLexer.currentTermSeparator
+ */
+lunr.QueryLexer.defaultTermSeparator = lunr.QueryLexer.termSeparator
+
+/**
+ * Returns the separator used to split a search string into terms.
+ *
+ * If lunr.QueryLexer.termSeparator has been changed from its default
+ * it is used, otherwise the current lunr.tokenizer.separator is used
+ * so that search strings are split in the same way as documents.
+ *
+ * @memberOf lunr.QueryLexer
+ * @returns {RegExp}
+ */
+lunr.QueryLexer.currentTermSeparator = function () {
+  if (lunr.QueryLexer.termSeparator !== lunr.QueryLexer.defaultTermSeparator) {
+    return lunr.QueryLexer.termSeparator
+  }
+
+  return lunr.tokenizer.separator
+}
+
 lunr.QueryLexer.lexText = function (lexer) {
+  var termSeparator = lunr.QueryLexer.currentTermSeparator()
+
   while (true) {
     var char = lexer.next()
 
@@ -3183,7 +3301,7 @@ lunr.QueryLexer.lexText = function (lexer) {
       return lunr.QueryLexer.lexText
     }
 
-    if (char.match(lunr.QueryLexer.termSeparator)) {
+    if (char.match(termSeparator)) {
       return lunr.QueryLexer.lexTerm
     }
   }
@@ -3464,7 +3582,12 @@ lunr.QueryParser.parseBoost = function (parser) {
       // Browser globals (root is window)
       root.lunr = factory()
     }
-  }(this, function () {
+  }(
+    // Prefer an explicit global object: `this` is undefined in strict mode and ES modules
+    typeof globalThis !== 'undefined' ? globalThis :
+      typeof self !== 'undefined' ? self :
+        typeof window !== 'undefined' ? window : this,
+    function () {
     /**
      * Just return a value to define the module export.
      * This example returns an object, but the module

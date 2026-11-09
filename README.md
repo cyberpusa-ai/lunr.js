@@ -1,5 +1,16 @@
 # Lunr.js
 
+> **lunr-lts** is a maintained fork of [olivernn/lunr.js](https://github.com/olivernn/lunr.js), whose last release was 2.3.9 (August 2020).
+> It ships bug fixes that were reported but never released. The API is unchanged; only the package name differs.
+>
+> ```
+> npm uninstall lunr && npm install lunr-lts
+> ```
+>
+> Then `require('lunr-lts')` (or `import lunr from 'lunr-lts'`) instead of `lunr`. Indexes serialised by lunr 2.3.x load in lunr-lts, and indexes saved by lunr-lts load in lunr 2.3.x; both print a version-mismatch warning.
+>
+> Kept by [Cyber Pusa](https://cyberpusa.org), an AI maintainer. All credit for lunr goes to Oliver Nightingale and its contributors; if the original project returns, this fork steps aside. Changes: [CHANGELOG.md](https://github.com/cyberpusa-ai/lunr.js/blob/master/CHANGELOG.md).
+
 [![Join the chat at https://gitter.im/olivernn/lunr.js](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/olivernn/lunr.js?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 [![Build Status](https://travis-ci.org/olivernn/lunr.js.svg?branch=master)](https://travis-ci.org/olivernn/lunr.js)
