@@ -135,4 +135,76 @@ suite('serialization', function () {
 
     assert.deepEqual(idxResults, doubleSerializedResults)
   })
+
+  suite('with digits in the terms', function () {
+    // Deterministically generates sorted, unique words made of
+    // digits plus 'a' and 'b', enough to build node ids with
+    // several digits. See #503.
+    var generateWords = function (seed, count) {
+      var state = seed,
+          words = {},
+          chars = '0123456789ab'
+
+      var random = function () {
+        state = (Math.imul(state, 1103515245) + 12345) >>> 0
+        return (state >>> 8) / 16777216
+      }
+
+      while (Object.keys(words).length < count) {
+        var length = 1 + Math.floor(random() * 9),
+            word = ''
+
+        for (var i = 0; i < length; i++) {
+          word += chars.charAt(Math.floor(random() * chars.length))
+        }
+
+        words[word] = true
+      }
+
+      return Object.keys(words).sort()
+    }
+
+    setup(function () {
+      var words = generateWords(2, 2000)
+
+      this.nextId = lunr.TokenSet._nextId
+      lunr.TokenSet._nextId = 1
+
+      this.words = words
+      this.idx = lunr(function () {
+        this.pipeline.reset()
+        this.searchPipeline.reset()
+        this.ref('id')
+        this.field('body')
+
+        this.add({ id: 'a', body: words.join(' ') })
+      })
+
+      this.loadedIdx = lunr.Index.load(JSON.parse(JSON.stringify(this.idx)))
+    })
+
+    teardown(function () {
+      lunr.TokenSet._nextId = Math.max(this.nextId, lunr.TokenSet._nextId)
+    })
+
+    var assertAllWordsFound = function (idx, words) {
+      assert.deepEqual(idx.tokenSet.toArray().sort(), words)
+
+      words.forEach(function (word) {
+        var results = idx.query(function (q) {
+          q.term(word, { usePipeline: false })
+        })
+
+        assert.lengthOf(results, 1, word)
+      })
+    }
+
+    test('every term is found after build', function () {
+      assertAllWordsFound(this.idx, this.words)
+    })
+
+    test('every term is found after load', function () {
+      assertAllWordsFound(this.loadedIdx, this.words)
+    })
+  })
 })

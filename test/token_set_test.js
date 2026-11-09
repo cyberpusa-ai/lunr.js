@@ -41,6 +41,24 @@ suite('lunr.TokenSet', function () {
       assert.notEqual(parentA.toString(), parentC.toString())
       assert.notEqual(parentA.toString(), parentB.toString())
     })
+
+    test('does not confuse digit labels with edge ids', function () {
+      var child2 = new lunr.TokenSet,
+          child4 = new lunr.TokenSet,
+          child234 = new lunr.TokenSet,
+          twoEdges = new lunr.TokenSet,
+          oneEdge = new lunr.TokenSet
+
+      child2.id = 2
+      child4.id = 4
+      child234.id = 234
+
+      twoEdges.edges['1'] = child2
+      twoEdges.edges['3'] = child4
+      oneEdge.edges['1'] = child234
+
+      assert.notEqual(twoEdges.toString(), oneEdge.toString())
+    })
   })
 
   suite('.fromString', function () {
@@ -48,7 +66,7 @@ suite('lunr.TokenSet', function () {
       lunr.TokenSet._nextId = 1
       var x = lunr.TokenSet.fromString('a')
 
-      assert.equal(x.toString(), '0a2')
+      assert.equal(x.toString(), '0a2,')
       assert.isOk(x.edges['a'].final)
     })
 
@@ -84,6 +102,51 @@ suite('lunr.TokenSet', function () {
           dcNode = tokenSet.edges['d'].edges['c']
 
       assert.deepEqual(acNode, dcNode)
+    })
+
+    suite('with digits in the words', function () {
+      // Deterministically generates sorted, unique words made of
+      // digits plus 'a' and 'b', enough to build node ids with
+      // several digits. See #503.
+      var generateWords = function (seed, count) {
+        var state = seed,
+            words = {},
+            chars = '0123456789ab'
+
+        var random = function () {
+          state = (Math.imul(state, 1103515245) + 12345) >>> 0
+          return (state >>> 8) / 16777216
+        }
+
+        while (Object.keys(words).length < count) {
+          var length = 1 + Math.floor(random() * 9),
+              word = ''
+
+          for (var i = 0; i < length; i++) {
+            word += chars.charAt(Math.floor(random() * chars.length))
+          }
+
+          words[word] = true
+        }
+
+        return Object.keys(words).sort()
+      }
+
+      setup(function () {
+        this.nextId = lunr.TokenSet._nextId
+        lunr.TokenSet._nextId = 1
+      })
+
+      teardown(function () {
+        lunr.TokenSet._nextId = Math.max(this.nextId, lunr.TokenSet._nextId)
+      })
+
+      test('contains exactly the words it was built from', function () {
+        var words = generateWords(2, 2000),
+            tokenSet = lunr.TokenSet.fromArray(words)
+
+        assert.deepEqual(tokenSet.toArray().sort(), words)
+      })
     })
   })
 
