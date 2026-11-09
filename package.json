@@ -1,12 +1,12 @@
 {
   "name": "lunr-lts",
-  "description": "Simple full-text search in your browser. Maintained fork of lunr.",
+  "description": "Maintained fork of lunr (lunr.js) — drop-in replacement, fixes wildcard/fuzzy search crashing with TypeError (reading '_index'), the strict-mode/ES module crash, and queries with punctuation like \"question?\" returning no results.",
   "version": "2.4.0",
   "author": "Oliver Nightingale",
   "contributors": [
     { "name": "Cyber Pusa", "email": "packages@cyberpusa.org", "url": "https://cyberpusa.org" }
   ],
-  "keywords": ["search", "full-text", "lunr"],
+  "keywords": ["lunr", "lunr.js", "lunrjs", "search", "full-text search", "full-text", "search index", "browser search", "static site search"],
   "homepage": "https://github.com/cyberpusa-ai/lunr.js#readme",
   "bugs": "https://github.com/cyberpusa-ai/lunr.js/issues",
   "main": "lunr.js",

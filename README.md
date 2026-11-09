@@ -1,4 +1,6 @@
-# Lunr.js
+# lunr-lts (Lunr.js)
+
+Maintained fork of lunr (lunr.js) — drop-in replacement, fixes wildcard/fuzzy search crashing with TypeError (reading '_index'), the strict-mode/ES module crash, and queries with punctuation like "question?" returning no results.
 
 > **lunr-lts** is a maintained fork of [olivernn/lunr.js](https://github.com/olivernn/lunr.js), whose last release was 2.3.9 (August 2020).
 > It ships bug fixes that were reported but never released. The API is unchanged; only the package name differs.
