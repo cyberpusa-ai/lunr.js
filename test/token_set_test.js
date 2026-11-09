@@ -41,6 +41,18 @@ suite('lunr.TokenSet', function () {
       assert.notEqual(parentA.toString(), parentC.toString())
       assert.notEqual(parentA.toString(), parentB.toString())
     })
+
+    test('does not confuse edge labels with edge ids', function () {
+      // https://github.com/olivernn/lunr.js/issues/503
+      var oneEdge = new lunr.TokenSet,
+          twoEdges = new lunr.TokenSet
+
+      oneEdge.edges['1'] = { id: 2134 }
+      twoEdges.edges['1'] = { id: 21 }
+      twoEdges.edges['3'] = { id: 4 }
+
+      assert.notEqual(oneEdge.toString(), twoEdges.toString())
+    })
   })
 
   suite('.fromString', function () {
@@ -84,6 +96,41 @@ suite('lunr.TokenSet', function () {
           dcNode = tokenSet.edges['d'].edges['c']
 
       assert.deepEqual(acNode, dcNode)
+    })
+
+    test('with words made of digits', function () {
+      // https://github.com/olivernn/lunr.js/issues/503
+      var seed = 1,
+          chars = '0123456789ab',
+          seen = {},
+          words = []
+
+      var random = function () {
+        seed = (seed * 16807) % 2147483647
+        return seed / 2147483647
+      }
+
+      for (var i = 0; i < 2000; i++) {
+        var word = '',
+            len = 1 + Math.floor(random() * 9)
+
+        for (var j = 0; j < len; j++) {
+          word += chars[Math.floor(random() * chars.length)]
+        }
+
+        if (!(word in seen)) {
+          seen[word] = true
+          words.push(word)
+        }
+      }
+
+      words.sort()
+
+      // node ids feed into the minimisation keys, start from a known id
+      lunr.TokenSet._nextId = 1
+      var tokenSet = lunr.TokenSet.fromArray(words)
+
+      assert.deepEqual(tokenSet.toArray().sort(), words)
     })
   })
 

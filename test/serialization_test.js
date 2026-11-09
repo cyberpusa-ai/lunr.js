@@ -43,6 +43,41 @@ suite('serialization', function () {
     assert.deepEqual(idxResults, serializedResults)
   })
 
+  test('search for numeric terms', function () {
+    // https://github.com/olivernn/lunr.js/issues/503
+    var seed = 7,
+        terms = []
+
+    for (var i = 0; i < 2000; i++) {
+      seed = (seed * 16807) % 2147483647
+      terms.push(String(seed % 1000000))
+    }
+
+    // node ids feed into the token set minimisation, start from a known id
+    lunr.TokenSet._nextId = 1
+    var idx = lunr(function () {
+      this.ref('id')
+      this.field('code')
+
+      terms.forEach(function (term, i) {
+        this.add({ id: String(i), code: term })
+      }, this)
+    })
+
+    var serializedIdx = JSON.parse(JSON.stringify(idx))
+    lunr.TokenSet._nextId = 1
+    var loadedIdx = lunr.Index.load(serializedIdx)
+
+    terms.forEach(function (term, i) {
+      var refs = function (results) {
+        return results.map(function (r) { return r.ref })
+      }
+
+      assert.include(refs(idx.search(term)), String(i), term)
+      assert.include(refs(loadedIdx.search(term)), String(i), term)
+    })
+  })
+
   test('search pipeline', function () {
     assert.deepEqual(['trimmer', 'stemmer'], JSON.parse(this.serializedIdx).pipeline)
   })
