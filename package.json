@@ -1,7 +1,7 @@
 {
   "name": "lunr-lts",
   "description": "Maintained fork of lunr (lunr.js) — drop-in replacement, fixes wildcard/fuzzy search crashing with TypeError (reading '_index'), the strict-mode/ES module crash, and queries with punctuation like \"question?\" returning no results.",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "author": "Oliver Nightingale",
   "contributors": [
     {
