@@ -1334,4 +1334,72 @@ suite('search', function () {
       assert.lengthOf(this.literalSearch('bui*'), 0)
     })
   })
+
+  suite('searching without accents', function () {
+    // the diacritics removal recipe documented in README.md
+    var removeDiacritics = function (token) {
+      return token.update(function (s) {
+        return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      })
+    }
+
+    var refs = function (results) {
+      return results.map(function (r) { return r.ref })
+    }
+
+    suiteSetup(function () {
+      lunr.Pipeline.registerFunction(removeDiacritics, 'removeDiacritics')
+    })
+
+    suiteTeardown(function () {
+      delete lunr.Pipeline.registeredFunctions.removeDiacritics
+    })
+
+    setup(function () {
+      this.idx = lunr(function () {
+        this.ref('id')
+        this.field('title')
+
+        this.pipeline.before(lunr.trimmer, removeDiacritics)
+        this.searchPipeline.before(lunr.trimmer, removeDiacritics)
+
+        this.add({ id: 'a', title: 'Le général et son écran' })
+        this.add({ id: 'b', title: 'Une autre histoire' })
+      })
+    })
+
+    test('without the recipe accents must match exactly', function () {
+      var idx = lunr(function () {
+        this.ref('id')
+        this.field('title')
+        this.add({ id: 'a', title: 'Le général et son écran' })
+      })
+
+      assert.lengthOf(idx.search('genéral'), 0)
+      assert.lengthOf(idx.search('ecran'), 0)
+    })
+
+    test('a differently accented word matches', function () {
+      assert.deepEqual(['a'], refs(this.idx.search('genéral')))
+      assert.deepEqual(['a'], refs(this.idx.search('general')))
+    })
+
+    test('an unaccented word matches an accented one', function () {
+      assert.deepEqual(['a'], refs(this.idx.search('ecran')))
+      assert.deepEqual(['a'], refs(this.idx.search('écran')))
+    })
+
+    test('a leading accented letter is not trimmed', function () {
+      assert.lengthOf(this.idx.search('cran'), 0)
+    })
+
+    test('a serialised index still ignores accents after loading', function () {
+      var serialised = JSON.parse(JSON.stringify(this.idx)),
+          loaded = lunr.Index.load(serialised)
+
+      assert.include(serialised.pipeline, 'removeDiacritics')
+      assert.deepEqual(['a'], refs(loaded.search('genéral')))
+      assert.deepEqual(['a'], refs(loaded.search('ecran')))
+    })
+  })
 })

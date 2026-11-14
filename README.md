@@ -117,6 +117,33 @@ Here `field:` prefixes and the `^`, `~`, `+` and `-` operators have no special m
 
 To use the query syntax but match a single operator character literally, escape it with a backslash: `idx.search("ERROR\\: This")`.
 
+## Searching without accents
+
+By default `"genéral"` does not find `"général"`. Also, the trimmer treats accented letters as non-word characters, so it removes them from the start and end of words, and `"écran"` is indexed as `"cran"`. To make search ignore accents, register a pipeline function that removes diacritics. Then add it before the trimmer in both the index pipeline and the search pipeline:
+
+```javascript
+var removeDiacritics = function (token) {
+  return token.update(function (s) {
+    return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  })
+}
+
+lunr.Pipeline.registerFunction(removeDiacritics, 'removeDiacritics')
+
+var idx = lunr(function () {
+  this.pipeline.before(lunr.trimmer, removeDiacritics)
+  this.searchPipeline.before(lunr.trimmer, removeDiacritics)
+
+  this.field('title')
+  this.add({ id: '1', title: 'Le général et son écran' })
+})
+
+idx.search('general') // finds "général"
+idx.search('ecran')   // finds "écran"
+```
+
+Registering the function lets an index that uses it be serialised. Before you call `lunr.Index.load`, register the function again with the same label, because loading fails with `Cannot load unregistered function` otherwise. `String#normalize` is ES2015 and is missing in some old browsers, such as Internet Explorer. If you need to support them, use a polyfill or a lookup table of accented characters.
+
 ## Contributing
 
 See the [`CONTRIBUTING.md` file](CONTRIBUTING.md).
